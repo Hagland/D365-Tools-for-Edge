@@ -44,11 +44,8 @@ Legend: ✅ done · 🔧 partial / needs fixing · [ ] not started
 ### Gaps to fix
 
 - 🔧 **"Open in other environment…"** — listed in `BUILT_IN_COMMANDS` but `executeItem` has no handler for it; falls through silently. Needs a sub-list of saved environments to pick from.
-- 🔧 **`DEFAULT_TABLES`** — declared in `content_script.js` by the user but not wired into `loadCommands()`, `TYPE_META`, or `CATEGORY_ORDER`. Wire it up or remove it.
-  - Add `table` entry to `TYPE_META` (colour TBD) and `CATEGORY_ORDER`
-  - Load `custom.tables` from storage in `loadCommands()`
-  - Add handler in `executeItem` (likely navigates to table browser filtered to that table name)
-  - Add `tables` array to `customCommands` schema in `shared/storage.js` and `CLAUDE.md`
+- ✅ **`DEFAULT_TABLES`** — wired into `loadCommands()`, `TYPE_META` (teal `#038387`), `CATEGORY_ORDER`, and `executeItem` (navigates to `?mi=SysTableBrowser&tableName=<label>`)
+- ✅ **Prefix scoping** — VS Code-style prefix characters scope the palette to one category: `>` commands, `/` menu items, `|` OData entities, `#` tables. Prefix hints shown in placeholder and footer.
 - 🔧 **Orphaned handlers in `executeItem`** — handlers exist for `Copy current URL`, `Open class runner`, `Personalisations › Clear all`, and `User options` but these were removed from `BUILT_IN_COMMANDS`. Either restore them to the command list or delete the handlers.
 
 ---
