@@ -123,6 +123,9 @@ A Microsoft Edge browser extension (Manifest V3) for Dynamics 365 Finance & Oper
     ],
     odataEntities: [
       // { label: "VendVendorV2" }
+    ],
+    tables: [
+      // { label: "CustTable" }  — opens in table browser: ?mi=SysTableBrowser&tableName=CustTable
     ]
   },
   version: 1

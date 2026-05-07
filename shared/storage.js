@@ -44,7 +44,7 @@ export async function saveDefaults(defaults) {
 export async function getCustomCommands() {
   return new Promise((resolve) => {
     chrome.storage.local.get(['customCommands'], (data) => {
-      resolve(data.customCommands ?? { menuItems: [], odataEntities: [] });
+      resolve(data.customCommands ?? { menuItems: [], odataEntities: [], tables: [] });
     });
   });
 }

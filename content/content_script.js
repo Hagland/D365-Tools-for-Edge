@@ -43,16 +43,34 @@ async function loadCommands() {
   const odataEntities = (custom.odataEntities?.length ? custom.odataEntities : DEFAULT_ODATA_ENTITIES)
     .map((item) => ({ type: 'odata', label: item.label }));
 
-  allCommands = [...BUILT_IN_COMMANDS, ...menuItems, ...odataEntities];
+  const tables = (custom.tables?.length ? custom.tables : DEFAULT_TABLES)
+    .map((item) => ({ type: 'table', label: item.label }));
+
+  allCommands = [...BUILT_IN_COMMANDS, ...menuItems, ...odataEntities, ...tables];
 }
 
 const TYPE_META = {
   command: { label: 'Commands',       color: '#0f6cbd' },
   menu:    { label: 'Menu items',     color: '#107c41' },
   odata:   { label: 'OData entities', color: '#8764b8' },
+  table:   { label: 'Tables',         color: '#038387' },
 };
 
-const CATEGORY_ORDER = ['command', 'menu', 'odata'];
+const CATEGORY_ORDER = ['command', 'menu', 'odata', 'table'];
+
+// Prefix characters that scope the palette to a single category (VS Code-style)
+const PREFIX_MAP = {
+  '>': 'command',
+  '/': 'menu',
+  '|': 'odata',
+  '#': 'table',
+};
+
+function parseQuery(raw) {
+  const type = PREFIX_MAP[raw[0]];
+  if (type) return { filter: raw.slice(1), types: [type] };
+  return { filter: raw, types: CATEGORY_ORDER };
+}
 
 let palette = null;
 let activeIdx = 0;
@@ -94,7 +112,7 @@ function openPalette() {
           <circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/>
           <line x1="11" y1="11" x2="14.5" y2="14.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
         </svg>
-        <input id="d365-palette-search" type="text" placeholder="Search commands, menus, entities…" autocomplete="off" spellcheck="false" />
+        <input id="d365-palette-search" type="text" placeholder="Search…  > commands  / menus  | odata  # tables" autocomplete="off" spellcheck="false" />
         <kbd class="d365-esc-badge">Esc</kbd>
       </div>
       <ul id="d365-palette-results" class="d365-palette-results" role="listbox"></ul>
@@ -103,6 +121,11 @@ function openPalette() {
         <span>&#8629; open</span>
         <span>Ctrl+&#8629; new tab</span>
         <span>Esc dismiss</span>
+        <span>&nbsp;·&nbsp;</span>
+        <span>&gt; commands</span>
+        <span>/ menus</span>
+        <span>| odata</span>
+        <span># tables</span>
       </div>
     </div>
   `;
@@ -125,14 +148,15 @@ function closePalette() {
 }
 
 function renderResults(query) {
-  const lower = query.toLowerCase();
+  const { filter, types } = parseQuery(query);
+  const lower = filter.toLowerCase();
   const list = document.getElementById('d365-palette-results');
   if (!list) return;
 
   filteredResults = [];
   list.innerHTML = '';
 
-  CATEGORY_ORDER.forEach((type) => {
+  types.forEach((type) => {
     const items = allCommands.filter(
       (c) => c.type === type && (!lower || c.label.toLowerCase().includes(lower))
     );
@@ -237,6 +261,12 @@ function executeItem(item, newTab) {
   // OData entities: label is the entity set name
   if (item.type === 'odata') {
     navigate(`${base}/data/${item.label}?cross-company=true`, newTab);
+    return;
+  }
+
+  // Tables: open in the table browser of the current environment
+  if (item.type === 'table') {
+    navigate(`${base}/?mi=SysTableBrowser&tableName=${encodeURIComponent(item.label)}`, newTab);
     return;
   }
 
