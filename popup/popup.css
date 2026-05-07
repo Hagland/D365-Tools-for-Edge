@@ -213,26 +213,6 @@ input  { font: inherit; }
 }
 .env-row-main:hover .env-chevron { opacity: 1; transform: translateX(1px); }
 
-.env-quick-links {
-  display: none;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 4px 10px 8px;
-}
-.env-row.expanded .env-quick-links { display: flex; }
-
-.quick-link {
-  font-size: 11px;
-  color: var(--accent);
-  border: 1px solid var(--stroke);
-  border-radius: 100px;
-  padding: 2px 8px;
-  background: none;
-  text-decoration: none;
-  white-space: nowrap;
-}
-.quick-link:hover { background: var(--accent-tint); border-color: var(--accent); }
-
 /* ── Footer ──────────────────────────────────────────────────── */
 .footer {
   height: 38px;
@@ -303,7 +283,7 @@ input  { font: inherit; }
 /* ── Colour picker popover ───────────────────────────────────── */
 .color-picker {
   position: absolute;
-  bottom: calc(100% + 6px);
+  top: calc(100% + 6px);
   left: 0;
   width: 220px;
   background: var(--bg-popup);

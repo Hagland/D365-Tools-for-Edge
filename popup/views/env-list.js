@@ -17,7 +17,6 @@ export function init({ onEdit, onAdd, onSettings }) {
 
   renderList();
 
-  // expose onEdit so renderList can call it per-row
   envList._onEdit = onEdit;
 }
 
@@ -45,7 +44,7 @@ export async function renderList(filter = '') {
     li.dataset.id = env.id;
 
     li.innerHTML = `
-      <div class="env-row-main" role="button" tabindex="0" aria-expanded="false">
+      <div class="env-row-main" role="button" tabindex="0" title="Click to edit · Ctrl+click to open">
         <span class="env-name">${escHtml(env.name)}</span>
         <span class="env-url">${escHtml(shortenUrl(env.url))}</span>
         <span class="env-dot" style="background:${escHtml(env.color)};"></span>
@@ -53,36 +52,23 @@ export async function renderList(filter = '') {
           <path d="M3 2l4 3-4 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </div>
-      <div class="env-quick-links">
-        <a class="quick-link" href="${escHtml(env.url)}/?mi=SysUserSetup" target="_blank">User options</a>
-        ${env.tableBrowser ? `<a class="quick-link" href="${escHtml(env.url)}/?mi=SysTableBrowser" target="_blank">Table browser</a>` : ''}
-        <a class="quick-link" href="${escHtml(env.url)}/?mi=EventTracking" target="_blank">DB log</a>
-        <button class="quick-link edit-btn" data-id="${escHtml(env.id)}">Edit ✎</button>
-      </div>
     `;
 
     const main = li.querySelector('.env-row-main');
 
     main.addEventListener('click', (e) => {
-      if (e.target.closest('.env-chevron')) {
-        e.stopPropagation();
-        const expanded = li.classList.toggle('expanded');
-        main.setAttribute('aria-expanded', expanded);
-        return;
+      if (e.ctrlKey) {
+        navigateTo(env.url, e);
+      } else {
+        envList._onEdit?.(env);
       }
-      navigateTo(env.url, e);
     });
 
     main.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        navigateTo(env.url, e);
+        envList._onEdit?.(env);
       }
-    });
-
-    li.querySelector('.edit-btn')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      envList._onEdit?.(env);
     });
 
     envList.appendChild(li);
@@ -90,9 +76,7 @@ export async function renderList(filter = '') {
 }
 
 function navigateTo(url, e) {
-  if (e.ctrlKey) {
-    chrome.tabs.create({ url });
-  } else if (e.shiftKey) {
+  if (e.shiftKey) {
     chrome.windows.create({ url });
   } else {
     chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {

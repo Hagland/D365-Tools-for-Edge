@@ -221,6 +221,7 @@ function updateActiveRow() {
 }
 
 function handlePaletteKey(e) {
+  e.stopPropagation();
   if (e.key === 'Escape') { closePalette(); return; }
   if (e.key === 'ArrowDown') {
     e.preventDefault();
@@ -298,26 +299,53 @@ async function syncMarker() {
 
   if (!env?.markerEnabled) return;
 
-  markerEl = document.createElement('div');
-  markerEl.id = 'd365-env-marker';
-  const pos = env.markerPosition ?? 'top-left';
+  const pos    = env.markerPosition ?? 'top-left';
   const isTop  = pos.startsWith('top');
   const isLeft = pos.endsWith('left');
+  const color  = env.color ?? '#0f6cbd';
 
+  // Outer container — clips the ribbon to the corner
+  markerEl = document.createElement('div');
+  markerEl.id = 'd365-env-marker';
   Object.assign(markerEl.style, {
-    position:     'fixed',
-    zIndex:       '999999',
-    width:        '6px',
-    height:       '48px',
-    background:   env.color ?? '#0f6cbd',
-    borderRadius: isTop ? (isLeft ? '0 0 4px 0' : '0 0 0 4px') : (isLeft ? '0 4px 0 0' : '4px 0 0 0'),
-    top:          isTop  ? '0'    : 'auto',
-    bottom:       isTop  ? 'auto' : '0',
-    left:         isLeft ? '0'    : 'auto',
-    right:        isLeft ? 'auto' : '0',
+    position:      'fixed',
+    width:         '160px',
+    height:        '160px',
+    overflow:      'hidden',
+    zIndex:        '999999',
     pointerEvents: 'none',
+    top:           isTop  ? '0'    : 'auto',
+    bottom:        isTop  ? 'auto' : '0',
+    left:          isLeft ? '0'    : 'auto',
+    right:         isLeft ? 'auto' : '0',
   });
 
+  // Inner strip — diagonal label rotated into the corner
+  const strip = document.createElement('div');
+  // TL and BR rotate the same way; TR and BL rotate the opposite way
+  const deg = (isTop === isLeft) ? -45 : 45;
+  Object.assign(strip.style, {
+    position:     'absolute',
+    width:        '240px',
+    padding:      '8px 4px',
+    background:   color,
+    color:        '#ffffff',
+    fontSize:     '12px',
+    fontWeight:   '700',
+    fontFamily:   '"Segoe UI Variable","Segoe UI",system-ui,sans-serif',
+    textAlign:    'center',
+    whiteSpace:   'nowrap',
+    overflow:     'hidden',
+    textOverflow: 'ellipsis',
+    transform:    `rotate(${deg}deg)`,
+    top:          isTop  ? '40px' : 'auto',
+    bottom:       isTop  ? 'auto' : '40px',
+    left:         isLeft ? '-60px' : 'auto',
+    right:        isLeft ? 'auto'  : '-60px',
+  });
+  strip.textContent = env.name;
+
+  markerEl.appendChild(strip);
   document.body.appendChild(markerEl);
 }
 
