@@ -18,7 +18,12 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://*.operations.dynamics.com/*"],
+    "matches": [
+      "https://*.operations.dynamics.com/*",
+      "https://*.operations.eu.dynamics.com/*",
+      "https://*.operations.de.dynamics.com/*",
+      "https://*.operations.microsoftdynamics.us/*"
+    ],
       "js": ["content/content_script.js"],
       "css": ["content/content_script.css"],
       "run_at": "document_idle"
