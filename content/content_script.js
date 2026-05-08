@@ -3,9 +3,9 @@
 // ── Built-in commands (hardcoded handlers, not user-configurable) ─
 // TODO: Example actions for now
 const BUILT_IN_COMMANDS = [
-  { type: 'command', label: 'Open in environment' },
-  { type: 'command', label: 'Build OData link' },
-  { type: 'command', label: 'Sync entities' },
+  { type: 'command', label: 'Open in environment',   description: 'Open the current page in another configured environment' },
+  { type: 'command', label: 'OData query designer',  description: 'Build and run OData queries against the current environment' },
+  { type: 'command', label: 'Sync entities',         description: 'Download and cache OData entity metadata from this environment' },
 ];
 
 // ── Runtime command list (built-ins + storage-loaded entries) ─
@@ -26,7 +26,7 @@ async function loadCommands() {
 
 const TYPE_META = {
   command: { label: 'Actions',    color: '#0f6cbd' },
-  menu:    { label: 'Menu items', color: '#107c41' },
+  menu:    { label: 'Navigation', color: '#107c41' },
   table:   { label: 'Tables',     color: '#038387' },
 };
 
@@ -106,8 +106,8 @@ function openPalette() {
         <span>Ctrl+&#8629; new tab</span>
         <span>Esc dismiss</span>
         <span>&nbsp;·&nbsp;</span>
-        <span>&gt; commands</span>
-        <span>| menus</span>
+        <span>&gt; actions</span>
+        <span>| navigation</span>
         <span># tables</span>
       </div>
     </div>
@@ -181,6 +181,15 @@ function renderResults(query) {
           <span class="d365-result-text">
             <span class="d365-result-name">${highlightMatch(friendlyName, terms)}</span>
             <span class="d365-result-path">${highlightMatch(item.label, terms)}</span>
+          </span>
+          <span class="d365-enter-hint" aria-hidden="true">&#8629;</span>
+        `;
+      } else if (item.description) {
+        li.innerHTML = `
+          <span class="d365-pip" style="background:${meta.color};"></span>
+          <span class="d365-result-text">
+            <span class="d365-result-name">${highlightMatch(item.label, terms)}</span>
+            <span class="d365-result-path">${escHtml(item.description)}</span>
           </span>
           <span class="d365-enter-hint" aria-hidden="true">&#8629;</span>
         `;
@@ -337,20 +346,20 @@ function showNotImplemented(label) {
 // ── OData builder sub-mode ────────────────────────────────────
 
 async function enterOdataBuilder() {
-  const data = await new Promise((r) => chrome.storage.local.get(['lastEntitiesSyncedAt'], r));
-  if (!data.lastEntitiesSyncedAt) {
-    await syncEntities(async () => openOdataBuilderMode());
-    return;
-  }
   await openOdataBuilderMode();
 }
 
 async function openOdataBuilderMode() {
   showPaletteMessage('Loading entities…', { spinner: true });
 
-  const resp = await chrome.runtime.sendMessage({ type: 'GET_ENTITY_LABELS' });
+  const resp = await chrome.runtime.sendMessage({ type: 'GET_ENTITY_LABELS', origin: window.location.origin });
   if (!resp?.ok) {
     showPaletteMessage(`Failed to load entities: ${resp?.error ?? 'Unknown error'}`, { error: true });
+    return;
+  }
+
+  if (resp.labels.length === 0) {
+    await syncEntities(async () => openOdataBuilderMode());
     return;
   }
 
@@ -369,14 +378,22 @@ async function openOdataBuilderMode() {
     <span>&#8629; select</span>
     <span>Esc back</span>
   `;
+  const right = document.createElement('span');
+  right.style.cssText = 'margin-left:auto;display:flex;gap:10px;align-items:center;';
+  if (resp.syncedAt) {
+    const ts = document.createElement('span');
+    ts.textContent = `Synced ${new Date(resp.syncedAt).toLocaleString()}`;
+    right.appendChild(ts);
+  }
   const refreshBtn = document.createElement('span');
-  refreshBtn.textContent = '&#8635; Refresh data';
-  refreshBtn.style.cssText = 'margin-left:auto;cursor:pointer;';
+  refreshBtn.textContent = '⟳ Refresh';
+  refreshBtn.style.cursor = 'pointer';
   refreshBtn.addEventListener('click', async () => {
     exitOdataBuilder();
     await syncEntities(async () => openOdataBuilderMode());
   });
-  footer.appendChild(refreshBtn);
+  right.appendChild(refreshBtn);
+  footer.appendChild(right);
 
   renderOdataBuilder('');
 }
@@ -459,7 +476,7 @@ function executeOdataEntity(label) {
 // ── Entity sync ───────────────────────────────────────────────
 
 async function syncEntities(afterSync = null) {
-  showPaletteMessage('Fetching $metadata… this may take a moment.', { spinner: true });
+  showPaletteMessage('Fetching entity data — this may take several minutes.', { spinner: true });
 
   let xml;
   try {
@@ -497,7 +514,7 @@ async function syncEntities(afterSync = null) {
   showPaletteMessage(`Saving ${entities.length} entities…`, { spinner: true });
 
   try {
-    const resp = await chrome.runtime.sendMessage({ type: 'SAVE_ENTITIES', entities });
+    const resp = await chrome.runtime.sendMessage({ type: 'SAVE_ENTITIES', entities, origin: window.location.origin });
     if (!resp?.ok) throw new Error(resp?.error ?? 'Unknown error');
   } catch (err) {
     showPaletteMessage(`Save failed: ${err.message}`, { error: true });
@@ -611,7 +628,7 @@ async function executeItem(item, newTab) {
     return;
   }
 
-  if (item.label === 'Build OData link') {
+  if (item.label === 'OData query designer') {
     await enterOdataBuilder();
     return;
   }

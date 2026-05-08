@@ -64,53 +64,51 @@ export async function saveDefaults(defaults) {
 }
 
 export async function getCustomCommands() {
-  const [menuItemsRec, tablesRec, odataEntities] = await Promise.all([
+  const [menuItemsRec, tablesRec] = await Promise.all([
     dbGet('kv', 'menuItems'),
     dbGet('kv', 'tables'),
-    dbGetAll('odataEntities'),
   ]);
   return {
-    menuItems:     menuItemsRec?.value ?? [],
-    tables:        tablesRec?.value    ?? [],
-    odataEntities,
+    menuItems: menuItemsRec?.value ?? [],
+    tables:    tablesRec?.value    ?? [],
   };
 }
 
 export async function saveCustomCommands(customCommands) {
-  const ops = [
+  await Promise.all([
     dbPut('kv', { key: 'menuItems', value: customCommands.menuItems ?? [] }),
     dbPut('kv', { key: 'tables',    value: customCommands.tables    ?? [] }),
-  ];
-  if (customCommands.odataEntities !== undefined) {
-    ops.push(dbClearAndPutAll('odataEntities', customCommands.odataEntities));
-  }
-  await Promise.all(ops);
+  ]);
   await syncCommandsToLocal();
 }
 
-export async function getOdataEntityLabels() {
-  const entities = await dbGetAll('odataEntities');
-  return entities.map((e) => e.label);
+export async function getOdataEntityLabels(origin) {
+  const rec = await dbGet('kv', `entities::${origin}`);
+  return (rec?.value ?? []).map((e) => e.label);
 }
 
-export async function saveOdataEntities(entities) {
+export async function getOdataEntitySyncedAt(origin) {
+  const rec = await dbGet('kv', `syncedAt::${origin}`);
+  return rec?.value ?? null;
+}
+
+export async function saveOdataEntities(entities, origin) {
   const syncedAt = new Date().toISOString();
   await Promise.all([
-    dbClearAndPutAll('odataEntities', entities),
-    dbPut('kv', { key: 'lastEntitiesSyncedAt', value: syncedAt }),
+    dbPut('kv', { key: `entities::${origin}`,  value: entities }),
+    dbPut('kv', { key: `syncedAt::${origin}`,  value: syncedAt }),
   ]);
-  await chrome.storage.local.set({ lastEntitiesSyncedAt: syncedAt });
 }
 
-/** Replace all stored data atomically — used by the full-config import. */
+/** Replace all stored data atomically — used by the full-config import.
+ *  OData entities are environment-specific and not included in config import/export. */
 export async function importAll({ environments, defaults, customCommands, version }) {
   await Promise.all([
     dbClearAndPutAll('environments', environments ?? []),
-    dbPut('kv', { key: 'defaults',  value: defaults   ?? defaultSettings() }),
-    dbPut('kv', { key: 'version',   value: version     ?? STORAGE_VERSION }),
-    dbPut('kv', { key: 'menuItems', value: customCommands?.menuItems     ?? [] }),
-    dbPut('kv', { key: 'tables',    value: customCommands?.tables        ?? [] }),
-    dbClearAndPutAll('odataEntities', customCommands?.odataEntities ?? []),
+    dbPut('kv', { key: 'defaults',  value: defaults  ?? defaultSettings() }),
+    dbPut('kv', { key: 'version',   value: version   ?? STORAGE_VERSION }),
+    dbPut('kv', { key: 'menuItems', value: customCommands?.menuItems ?? [] }),
+    dbPut('kv', { key: 'tables',    value: customCommands?.tables    ?? [] }),
   ]);
   await Promise.all([syncEnvsToLocal(), syncCommandsToLocal()]);
 }
