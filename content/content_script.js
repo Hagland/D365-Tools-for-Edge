@@ -3,10 +3,7 @@
 // ── Built-in commands (hardcoded handlers, not user-configurable) ─
 // TODO: Example actions for now
 const BUILT_IN_COMMANDS = [
-  { type: 'command', label: 'Open in other environment…' },
-  { type: 'command', label: 'Open table browser' },
-  { type: 'command', label: 'Show control names' },
-  { type: 'command', label: 'Open database log' },
+  { type: 'command', label: 'Open in environment' },
 ];
 
 // ── Runtime command list (built-ins + storage-loaded entries) ─
@@ -52,6 +49,7 @@ function parseQuery(raw) {
 let palette    = null;
 let activeIdx  = 0;
 let filteredResults = [];
+let suppressMouseEnter = false;
 
 // env-picker sub-mode state
 let paletteMode   = 'normal'; // 'normal' | 'env-picker'
@@ -123,6 +121,7 @@ function openPalette() {
   input.addEventListener('input', onPaletteInput);
 
   palette.addEventListener('keydown', handlePaletteKey);
+  palette.addEventListener('mousemove', () => { suppressMouseEnter = false; });
   palette.addEventListener('click', (e) => { if (e.target === palette) closePalette(); });
 
   renderResults('');
@@ -197,7 +196,7 @@ function renderResults(query) {
       }
 
       li.addEventListener('click', (e) => executeItem(item, e.ctrlKey));
-      li.addEventListener('mouseenter', () => setActiveIdx(idx));
+      li.addEventListener('mouseenter', () => { if (!suppressMouseEnter) setActiveIdx(idx); });
       list.appendChild(li);
     });
   });
@@ -391,9 +390,11 @@ function handlePaletteKey(e) {
   }
   if (e.key === 'ArrowDown') {
     e.preventDefault();
+    suppressMouseEnter = true;
     setActiveIdx(Math.min(activeIdx + 1, filteredResults.length - 1));
   } else if (e.key === 'ArrowUp') {
     e.preventDefault();
+    suppressMouseEnter = true;
     setActiveIdx(Math.max(activeIdx - 1, 0));
   } else if (e.key === 'Enter') {
     e.preventDefault();
@@ -408,21 +409,11 @@ function handlePaletteKey(e) {
 async function executeItem(item, newTab) {
   const base = window.location.origin;
 
-  if (item.label === 'Open in other environment…') {
+  if (item.label === 'Open in environment') {
     await enterEnvPicker();
     return;
   }
 
-  // Built-in command handlers (matched by label since these are fixed strings)
-  const builtInActions = {
-    'Copy current URL':          () => { navigator.clipboard.writeText(window.location.href); closePalette(); },
-    'Open table browser':        () => navigate(`${base}/?mi=SysTableBrowser`, newTab),
-    'Show control names':        () => navigate(`${base}/?debug=vs%3a1`, newTab),
-    'Open class runner':         () => navigate(`${base}/?mi=SysClassRunner`, newTab),
-    'Open database log':         () => navigate(`${base}/?mi=EventTracking`, newTab),
-    'Personalisations › Clear all': () => navigate(`${base}/?mi=SysPersonalizationAdmin`, newTab),
-    'User options':              () => navigate(`${base}/?mi=SysUserSetup`, newTab),
-  };
 
   const fn = builtInActions[item.label];
   if (fn) { fn(); return; }

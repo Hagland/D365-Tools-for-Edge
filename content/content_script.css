@@ -124,7 +124,6 @@
   cursor: pointer;
   color: var(--d365-text-primary);
 }
-.d365-result-row:hover,
 .d365-result-row.active {
   background: var(--d365-accent-tint);
 }
