@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//tmp/**)",
+      "Bash(node gen.js /tmp/icon_gen/icon.svg C:/Users/Erik/Documents/projects/D365-Tools-for-Edge/.claude/worktrees/elastic-spence-4621e6/assets/icons)",
+      "Bash(rm \"C:/Users/Erik/Documents/projects/D365-Tools-for-Edge/.claire/worktrees/elastic-spence-4621e6/assets/FinanceOperations_scalable.svg\" 2>/dev/null *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
+    ]
+  }
+}

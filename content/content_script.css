@@ -89,6 +89,22 @@
   overflow-y: auto;
   padding: 4px 0;
   margin: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--d365-stroke-strong) transparent;
+}
+
+.d365-palette-results::-webkit-scrollbar {
+  width: 6px;
+}
+.d365-palette-results::-webkit-scrollbar-track {
+  background: transparent;
+}
+.d365-palette-results::-webkit-scrollbar-thumb {
+  background: var(--d365-stroke-strong);
+  border-radius: 3px;
+}
+.d365-palette-results::-webkit-scrollbar-thumb:hover {
+  background: var(--d365-text-tertiary);
 }
 
 .d365-group-label {
@@ -124,6 +140,30 @@
   flex: 1;
   font-size: 13px;
   font-weight: 500;
+}
+
+.d365-result-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.d365-result-name {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.d365-result-path {
+  font-size: 11px;
+  color: var(--d365-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .d365-enter-hint {

@@ -557,7 +557,12 @@ input  { font: inherit; }
 .import-export-row {
   display: flex;
   gap: 8px;
-  flex-wrap: wrap;
+}
+
+.import-export-row .btn-secondary,
+.import-export-row .import-label {
+  flex: 1;
+  justify-content: center;
 }
 
 .import-label { cursor: pointer; display: inline-flex; align-items: center; }

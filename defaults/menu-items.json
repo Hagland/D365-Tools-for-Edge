@@ -1,0 +1,18 @@
+[
+  { "label": "Accounts payable > Workspaces > Vendor invoice entry", "mi": "VendInvoiceWorkspace"},
+  { "label": "Accounts payable > Workspaces > Vendor invoice automation", "mi": "VendInvoiceAutomationWorkspace"},
+  { "label": "Accounts payable > Workspaces > Vendor payments", "mi": "VendPaymentWorkspace"},
+  { "label": "Accounts payable > Vendors > All vendors", "mi": "VendTableListPage"},
+  { "label": "Accounts payable > Vendors > Vendors on hold", "mi": "VendTableHoldListPage"},
+  { "label": "Accounts payable > Vendors > Vendors past due", "mi": "VendTablePastDueListPage"},
+  { "label": "Accounts payable > Vendors > Vendors who are diverse", "mi": "VendTableDiverseListPage"},
+  { "label": "Accounts payable > Vendors > Vendor exception groups", "mi": "VendExceptionGroup"},
+  { "label": "Accounts payable > Vendors > Vendor price tolerance groups", "mi": "VendPriceToleranceGroup"},
+  { "label": "Accounts payable > Purchase orders > All purchase orders", "mi": "PurchTableListPage"},
+  { "label": "Accounts payable > Purchase orders > Purchase orders assigned to me", "mi": "PurchTableListPageAssignedToMe"},
+  { "label": "Accounts payable > Purchase orders > Purchase orders received but not invoiced", "mi": "PurchTableReceivedNotInvoicedListPage"},
+  { "label": "Accounts payable > Purchase orders > Purchase agreements", "mi": "PurchAgreementListPage"},
+  { "label": "Accounts payable > Purchase orders > Open prepayments", "mi": "PurchPrepayOpen"},
+  { "label": "General ledger > Journal entries > General journals", "mi": "LedgerJournalTable3" },
+  { "label": "General ledger > Inquiries & reports > Trial balance", "mi": "LedgerTrialBalanceListPage" }
+]
