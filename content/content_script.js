@@ -4,6 +4,8 @@
 // TODO: Example actions for now
 const BUILT_IN_COMMANDS = [
   { type: 'command', label: 'Open in environment' },
+  { type: 'command', label: 'Build OData link' },
+  { type: 'command', label: 'Refresh OData entities' },
 ];
 
 // ── Runtime command list (built-ins + storage-loaded entries) ─
@@ -16,27 +18,24 @@ async function loadCommands() {
   const { customCommands } = await chrome.storage.local.get(['customCommands']);
   const custom = customCommands ?? {};
 
-  const menuItems     = (custom.menuItems     ?? []).map((item) => ({ type: 'menu',  label: item.label, mi: item.mi }));
-  const odataEntities = (custom.odataEntities ?? []).map((item) => ({ type: 'odata', label: item.label }));
-  const tables        = (custom.tables        ?? []).map((item) => ({ type: 'table', label: item.label }));
+  const menuItems = (custom.menuItems ?? []).map((item) => ({ type: 'menu',  label: item.label, mi: item.mi }));
+  const tables    = (custom.tables    ?? []).map((item) => ({ type: 'table', label: item.label }));
 
-  allCommands = [...BUILT_IN_COMMANDS, ...menuItems, ...odataEntities, ...tables];
+  allCommands = [...BUILT_IN_COMMANDS, ...menuItems, ...tables];
 }
 
 const TYPE_META = {
-  command: { label: 'Commands',       color: '#0f6cbd' },
-  menu:    { label: 'Menu items',     color: '#107c41' },
-  odata:   { label: 'OData entities', color: '#8764b8' },
-  table:   { label: 'Tables',         color: '#038387' },
+  command: { label: 'Commands',   color: '#0f6cbd' },
+  menu:    { label: 'Menu items', color: '#107c41' },
+  table:   { label: 'Tables',     color: '#038387' },
 };
 
-const CATEGORY_ORDER = ['command', 'menu', 'odata', 'table'];
+const CATEGORY_ORDER = ['command', 'menu', 'table'];
 
 // Prefix characters that scope the palette to a single category (VS Code-style)
 const PREFIX_MAP = {
   '>': 'command',
-  '/': 'menu',
-  '|': 'odata',
+  '|': 'menu',
   '#': 'table',
 };
 
@@ -51,8 +50,8 @@ let activeIdx  = 0;
 let filteredResults = [];
 let suppressMouseEnter = false;
 
-// env-picker sub-mode state
-let paletteMode   = 'normal'; // 'normal' | 'env-picker'
+// sub-mode state  ('normal' | 'env-picker')
+let paletteMode   = 'normal';
 let savedQuery    = '';
 let envPickerEnvs = [];
 
@@ -107,8 +106,7 @@ function openPalette() {
         <span>Esc dismiss</span>
         <span>&nbsp;·&nbsp;</span>
         <span>&gt; commands</span>
-        <span>/ menus</span>
-        <span>| odata</span>
+        <span>| menus</span>
         <span># tables</span>
       </div>
     </div>
@@ -137,11 +135,8 @@ function closePalette() {
 
 function onPaletteInput() {
   const val = document.getElementById('d365-palette-search')?.value ?? '';
-  if (paletteMode === 'env-picker') {
-    renderEnvPicker(val);
-  } else {
-    renderResults(val);
-  }
+  if (paletteMode === 'env-picker') renderEnvPicker(val);
+  else                              renderResults(val);
 }
 
 // ── Normal results ────────────────────────────────────────────
@@ -318,6 +313,17 @@ function executeEnvItem(env) {
   }
 }
 
+function showNotImplemented(label) {
+  const list = document.getElementById('d365-palette-results');
+  if (!list) return;
+  filteredResults = [];
+  list.innerHTML = '';
+  const msg = document.createElement('li');
+  msg.style.cssText = 'padding:20px 14px;text-align:center;color:var(--d365-text-secondary);font-size:13px;';
+  msg.textContent = `"${label}" — to be implemented.`;
+  list.appendChild(msg);
+}
+
 // ── Shared palette helpers ────────────────────────────────────
 
 function matchesAllTerms(text, terms) {
@@ -398,11 +404,8 @@ function handlePaletteKey(e) {
     setActiveIdx(Math.max(activeIdx - 1, 0));
   } else if (e.key === 'Enter') {
     e.preventDefault();
-    if (paletteMode === 'env-picker') {
-      if (filteredResults[activeIdx]) executeEnvItem(filteredResults[activeIdx]);
-    } else {
-      if (filteredResults[activeIdx]) executeItem(filteredResults[activeIdx], e.ctrlKey);
-    }
+    if (paletteMode === 'env-picker') { if (filteredResults[activeIdx]) executeEnvItem(filteredResults[activeIdx]); }
+    else                               { if (filteredResults[activeIdx]) executeItem(filteredResults[activeIdx], e.ctrlKey); }
   }
 }
 
@@ -414,6 +417,11 @@ async function executeItem(item, newTab) {
     return;
   }
 
+  if (item.label === 'Build OData link' || item.label === 'Refresh OData entities') {
+    showNotImplemented(item.label);
+    return;
+  }
+
 
   const fn = builtInActions[item.label];
   if (fn) { fn(); return; }
@@ -422,12 +430,6 @@ async function executeItem(item, newTab) {
   if (item.type === 'menu') {
     const mi = item.mi ?? item.label.split(' > ').pop().replace(/\s+/g, '');
     navigate(`${base}/?mi=${encodeURIComponent(mi)}`, newTab);
-    return;
-  }
-
-  // OData entities: label is the entity set name
-  if (item.type === 'odata') {
-    navigate(`${base}/data/${item.label}?cross-company=true`, newTab);
     return;
   }
 
