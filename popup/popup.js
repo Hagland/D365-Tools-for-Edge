@@ -26,8 +26,8 @@ function showView(name) {
 
 // ── Wire views ────────────────────────────────────────────────
 initList({
-  onEdit:     (env) => { openForm(env); showView('form'); },
-  onAdd:      ()    => { openForm(null); showView('form'); },
+  onEdit:     async (env) => { await openForm(env);   showView('form'); },
+  onAdd:      async ()    => { await openForm(null);  showView('form'); },
   onSettings: ()    => { loadSettings(); showView('settings'); },
 });
 

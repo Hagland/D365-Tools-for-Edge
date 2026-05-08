@@ -6,5 +6,9 @@ chrome.commands.onCommand.addListener(async (command) => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) return;
 
-  chrome.tabs.sendMessage(tab.id, { type: 'OPEN_PALETTE' });
+  try {
+    await chrome.tabs.sendMessage(tab.id, { type: 'OPEN_PALETTE' });
+  } catch {
+    // Content script not present on this tab (non-D365 page) — silently ignore
+  }
 });

@@ -1,6 +1,6 @@
 // Screen 2 — Add / Edit environment form (including colour picker)
 
-import { saveEnvironment, deleteEnvironment } from '../../shared/storage.js';
+import { getStorage, saveEnvironment, deleteEnvironment } from '../../shared/storage.js';
 import {
   hexToHsv, hsvToHex, hexToRgbStyle,
   setToggle, getToggle, wireToggle,
@@ -59,14 +59,14 @@ export function init({ onBack, onSaved }) {
 }
 
 /** Populate and show the form for a new or existing environment. */
-export function open(env) {
+export async function open(env) {
   editingId = env?.id ?? null;
   document.getElementById('form-title').textContent = env ? 'Edit environment' : 'Add environment';
   document.getElementById('btn-delete').style.display = env ? '' : 'none';
   document.getElementById('input-name').value = env?.name ?? '';
   document.getElementById('input-url').value  = env?.url  ?? '';
 
-  const color = env?.color ?? '#0f6cbd';
+  const color = env?.color ?? await pickUnusedColor();
   setSwatchColor(color);
   pickerColor = hexToHsv(color);
   updatePickerUI();
@@ -88,7 +88,7 @@ async function saveForm(onBack, onSaved) {
     id:             editingId ?? crypto.randomUUID(),
     name,
     url,
-    color:          colorSwatch.style.background,
+    color:          hsvToHex(pickerColor.h, pickerColor.s, pickerColor.v),
     markerEnabled:  getToggle('toggle-marker'),
     markerPosition: getSelectedPosition('position-grid'),
     tableBrowser:   getToggle('toggle-table-browser'),
@@ -98,6 +98,15 @@ async function saveForm(onBack, onSaved) {
 
   onSaved();
   onBack();
+}
+
+// ── Colour selection ──────────────────────────────────────────
+
+async function pickUnusedColor() {
+  const { environments } = await getStorage();
+  const usedColors = new Set(environments.map((e) => e.color?.toLowerCase()));
+  const unused = PRESETS.find((hex) => !usedColors.has(hex.toLowerCase()));
+  return unused ?? PRESETS[0];
 }
 
 // ── Colour picker ─────────────────────────────────────────────

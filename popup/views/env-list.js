@@ -45,8 +45,10 @@ export async function renderList(filter = '') {
 
     li.innerHTML = `
       <div class="env-row-main" role="button" tabindex="0" title="Click to edit · Ctrl+click to open">
-        <span class="env-name">${escHtml(env.name)}</span>
-        <span class="env-url">${escHtml(shortenUrl(env.url))}</span>
+        <div class="env-text-wrap">
+          <span class="env-name">${escHtml(env.name)}</span>
+          <span class="env-url">${escHtml(shortenUrl(env.url))}</span>
+        </div>
         <span class="env-dot" style="background:${escHtml(env.color)};"></span>
         <svg class="env-chevron" viewBox="0 0 10 10" width="10" height="10" fill="none" aria-hidden="true">
           <path d="M3 2l4 3-4 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
