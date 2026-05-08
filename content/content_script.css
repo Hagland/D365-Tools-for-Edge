@@ -175,6 +175,21 @@
   opacity: 1;
 }
 
+@keyframes d365-spin {
+  to { transform: rotate(360deg); }
+}
+
+.d365-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--d365-stroke-strong);
+  border-top-color: var(--d365-accent);
+  border-radius: 50%;
+  animation: d365-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
 .d365-palette-footer {
   display: flex;
   gap: 12px;

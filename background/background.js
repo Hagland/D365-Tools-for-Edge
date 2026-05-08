@@ -1,6 +1,6 @@
 // Service worker: seed default commands on install, relay keyboard shortcut
 
-import { getCustomCommands, saveCustomCommands } from '../shared/storage.js';
+import { getCustomCommands, saveCustomCommands, saveOdataEntities, getOdataEntityLabels } from '../shared/storage.js';
 
 // ── Seeding ───────────────────────────────────────────────────
 
@@ -42,6 +42,23 @@ function mergeByKey(existing, defaults, key) {
   });
   return deduped;
 }
+
+// ── Message handlers ──────────────────────────────────────────
+
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.type === 'SAVE_ENTITIES') {
+    saveOdataEntities(msg.entities)
+      .then(() => sendResponse({ ok: true }))
+      .catch((err) => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
+  if (msg.type === 'GET_ENTITY_LABELS') {
+    getOdataEntityLabels()
+      .then((labels) => sendResponse({ ok: true, labels }))
+      .catch((err) => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
+});
 
 // ── Keyboard shortcut relay ───────────────────────────────────
 

@@ -88,6 +88,20 @@ export async function saveCustomCommands(customCommands) {
   await syncCommandsToLocal();
 }
 
+export async function getOdataEntityLabels() {
+  const entities = await dbGetAll('odataEntities');
+  return entities.map((e) => e.label);
+}
+
+export async function saveOdataEntities(entities) {
+  const syncedAt = new Date().toISOString();
+  await Promise.all([
+    dbClearAndPutAll('odataEntities', entities),
+    dbPut('kv', { key: 'lastEntitiesSyncedAt', value: syncedAt }),
+  ]);
+  await chrome.storage.local.set({ lastEntitiesSyncedAt: syncedAt });
+}
+
 /** Replace all stored data atomically — used by the full-config import. */
 export async function importAll({ environments, defaults, customCommands, version }) {
   await Promise.all([
