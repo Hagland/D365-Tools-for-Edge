@@ -1,6 +1,6 @@
 // Screen 3 — Settings (defaults & data management)
 
-import { getStorage, getDefaults, saveDefaults, getCustomCommands, saveCustomCommands } from '../../shared/storage.js';
+import { getStorage, getDefaults, saveDefaults, getCustomCommands, saveCustomCommands, importAll } from '../../shared/storage.js';
 import {
   setToggle, getToggle, wireToggle,
   setMarkerPositionWrap, wirePositionGrid, selectPosition, getSelectedPosition,
@@ -83,11 +83,11 @@ async function importConfig(e, onImported) {
   try {
     const data = JSON.parse(await file.text());
     if (!Array.isArray(data.environments)) throw new Error('Invalid format: missing environments array.');
-    await chrome.storage.local.set({
+    await importAll({
       environments:   data.environments,
-      defaults:       data.defaults       ?? {},
-      customCommands: data.customCommands ?? { menuItems: [], odataEntities: [], tables: [] },
-      version:        data.version        ?? 1,
+      defaults:       data.defaults,
+      customCommands: data.customCommands,
+      version:        data.version,
     });
     showStatus('import-status', 'Import successful.', 'success');
     await load();

@@ -246,8 +246,7 @@ function exitEnvPicker() {
     <span>Esc dismiss</span>
     <span>&nbsp;·&nbsp;</span>
     <span>&gt; commands</span>
-    <span>/ menus</span>
-    <span>| odata</span>
+    <span>| menus</span>
     <span># tables</span>
   `;
 
@@ -422,9 +421,6 @@ async function executeItem(item, newTab) {
     return;
   }
 
-
-  const fn = builtInActions[item.label];
-  if (fn) { fn(); return; }
 
   // Menu items: use explicit `mi` if provided, fall back to last label segment
   if (item.type === 'menu') {

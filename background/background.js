@@ -1,5 +1,7 @@
 // Service worker: seed default commands on install, relay keyboard shortcut
 
+import { getCustomCommands, saveCustomCommands } from '../shared/storage.js';
+
 // ── Seeding ───────────────────────────────────────────────────
 
 chrome.runtime.onInstalled.addListener(seedCustomCommands);
@@ -11,15 +13,12 @@ async function seedCustomCommands() {
     loadDefault('odata-entities.json'),
   ]);
 
-  const { customCommands } = await chrome.storage.local.get(['customCommands']);
-  const existing = customCommands ?? {};
+  const existing = await getCustomCommands();
 
-  await chrome.storage.local.set({
-    customCommands: {
-      menuItems:     mergeByKey(existing.menuItems     ?? [], defaultMenuItems,     'mi'),
-      tables:        mergeByKey(existing.tables        ?? [], defaultTables,        'label'),
-      odataEntities: mergeByKey(existing.odataEntities ?? [], defaultOdataEntities, 'label'),
-    },
+  await saveCustomCommands({
+    menuItems:     mergeByKey(existing.menuItems     ?? [], defaultMenuItems,     'mi'),
+    tables:        mergeByKey(existing.tables        ?? [], defaultTables,        'label'),
+    odataEntities: mergeByKey(existing.odataEntities ?? [], defaultOdataEntities, 'label'),
   });
 }
 
