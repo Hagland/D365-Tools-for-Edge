@@ -1,5 +1,7 @@
 # D365 Edge Helper
 
+Fully AI generated.
+
 A Microsoft Edge browser extension for Dynamics 365 Finance & Operations consultants and power users. It adds a toolbar popup for managing multiple D365 environments and a keyboard-driven command palette for navigating D365 without touching the mouse.
 
 ## Features
