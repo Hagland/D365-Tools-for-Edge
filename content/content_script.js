@@ -72,9 +72,14 @@ function parseQuery(raw) {
   return { filter: raw, types: CATEGORY_ORDER };
 }
 
-let palette = null;
-let activeIdx = 0;
+let palette    = null;
+let activeIdx  = 0;
 let filteredResults = [];
+
+// env-picker sub-mode state
+let paletteMode   = 'normal'; // 'normal' | 'env-picker'
+let savedQuery    = '';
+let envPickerEnvs = [];
 
 // ── Message listener ──────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg) => {
@@ -85,7 +90,9 @@ chrome.runtime.onMessage.addListener((msg) => {
 chrome.storage.onChanged.addListener(async (changes) => {
   if ('customCommands' in changes) {
     await loadCommands();
-    if (palette) renderResults(document.getElementById('d365-palette-search')?.value ?? '');
+    if (palette && paletteMode === 'normal') {
+      renderResults(document.getElementById('d365-palette-search')?.value ?? '');
+    }
   }
   syncMarker();
 });
@@ -100,6 +107,8 @@ async function togglePalette() {
 }
 
 function openPalette() {
+  paletteMode = 'normal';
+
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
   palette = document.createElement('div');
@@ -134,7 +143,7 @@ function openPalette() {
 
   const input = document.getElementById('d365-palette-search');
   input.focus();
-  input.addEventListener('input', () => renderResults(input.value));
+  input.addEventListener('input', onPaletteInput);
 
   palette.addEventListener('keydown', handlePaletteKey);
   palette.addEventListener('click', (e) => { if (e.target === palette) closePalette(); });
@@ -144,8 +153,22 @@ function openPalette() {
 
 function closePalette() {
   palette?.remove();
-  palette = null;
+  palette       = null;
+  paletteMode   = 'normal';
+  savedQuery    = '';
+  envPickerEnvs = [];
 }
+
+function onPaletteInput() {
+  const val = document.getElementById('d365-palette-search')?.value ?? '';
+  if (paletteMode === 'env-picker') {
+    renderEnvPicker(val);
+  } else {
+    renderResults(val);
+  }
+}
+
+// ── Normal results ────────────────────────────────────────────
 
 function renderResults(query) {
   const { filter, types } = parseQuery(query);
@@ -192,6 +215,121 @@ function renderResults(query) {
   updateActiveRow();
 }
 
+// ── Environment picker sub-mode ───────────────────────────────
+
+async function enterEnvPicker() {
+  const data = await new Promise((r) => chrome.storage.local.get(['environments'], r));
+  const environments = data.environments ?? [];
+  const currentOrigin = window.location.origin.toLowerCase();
+
+  envPickerEnvs = environments.filter((env) => {
+    try { return new URL(env.url).origin.toLowerCase() !== currentOrigin; } catch { return false; }
+  });
+
+  paletteMode = 'env-picker';
+
+  const input = document.getElementById('d365-palette-search');
+  savedQuery = input.value;
+  input.value = '';
+  input.placeholder = 'Select environment…';
+  input.focus();
+
+  const footer = palette.querySelector('.d365-palette-footer');
+  footer.innerHTML = `
+    <span>&#8593; &#8595; navigate</span>
+    <span>&#8629; open in new tab</span>
+    <span>Esc back</span>
+  `;
+
+  renderEnvPicker('');
+}
+
+function exitEnvPicker() {
+  paletteMode   = 'normal';
+  envPickerEnvs = [];
+
+  const input = document.getElementById('d365-palette-search');
+  input.value = savedQuery;
+  input.placeholder = 'Search…  > commands  / menus  | odata  # tables';
+  input.focus();
+
+  const footer = palette.querySelector('.d365-palette-footer');
+  footer.innerHTML = `
+    <span>&#8593; &#8595; navigate</span>
+    <span>&#8629; open</span>
+    <span>Ctrl+&#8629; new tab</span>
+    <span>Esc dismiss</span>
+    <span>&nbsp;·&nbsp;</span>
+    <span>&gt; commands</span>
+    <span>/ menus</span>
+    <span>| odata</span>
+    <span># tables</span>
+  `;
+
+  renderResults(savedQuery);
+}
+
+function renderEnvPicker(filter) {
+  const list = document.getElementById('d365-palette-results');
+  if (!list) return;
+
+  const lower = filter.toLowerCase();
+  const shown = lower
+    ? envPickerEnvs.filter((e) => e.name.toLowerCase().includes(lower))
+    : envPickerEnvs;
+
+  filteredResults = shown;
+  list.innerHTML = '';
+
+  if (shown.length === 0) {
+    const empty = document.createElement('li');
+    empty.className = 'd365-group-label';
+    empty.style.padding = '12px 14px';
+    empty.textContent = envPickerEnvs.length === 0
+      ? 'No other environments configured.'
+      : 'No environments match.';
+    list.appendChild(empty);
+    activeIdx = 0;
+    return;
+  }
+
+  const groupLabel = document.createElement('li');
+  groupLabel.className = 'd365-group-label';
+  groupLabel.textContent = 'Environments';
+  groupLabel.setAttribute('role', 'presentation');
+  list.appendChild(groupLabel);
+
+  shown.forEach((env, idx) => {
+    const li = document.createElement('li');
+    li.className = 'd365-result-row';
+    li.setAttribute('role', 'option');
+    li.dataset.idx = idx;
+    li.innerHTML = `
+      <span class="d365-pip" style="background:${escHtml(env.color ?? '#0f6cbd')};"></span>
+      <span class="d365-result-label">${highlightMatch(env.name, lower)}</span>
+      <span class="d365-enter-hint" aria-hidden="true">&#8629;</span>
+    `;
+    li.addEventListener('click', () => executeEnvItem(env));
+    li.addEventListener('mouseenter', () => setActiveIdx(idx));
+    list.appendChild(li);
+  });
+
+  activeIdx = 0;
+  updateActiveRow();
+}
+
+function executeEnvItem(env) {
+  try {
+    const targetOrigin = new URL(env.url).origin;
+    const path = window.location.pathname + window.location.search + window.location.hash;
+    navigate(targetOrigin + path, true);
+  } catch {
+    closePalette();
+  }
+}
+
+// ── Shared palette helpers ────────────────────────────────────
+
 function highlightMatch(text, query) {
   if (!query) return escHtml(text);
   const lower = text.toLowerCase();
@@ -222,7 +360,11 @@ function updateActiveRow() {
 
 function handlePaletteKey(e) {
   e.stopPropagation();
-  if (e.key === 'Escape') { closePalette(); return; }
+  if (e.key === 'Escape') {
+    if (paletteMode === 'env-picker') { exitEnvPicker(); return; }
+    closePalette();
+    return;
+  }
   if (e.key === 'ArrowDown') {
     e.preventDefault();
     setActiveIdx(Math.min(activeIdx + 1, filteredResults.length - 1));
@@ -231,12 +373,21 @@ function handlePaletteKey(e) {
     setActiveIdx(Math.max(activeIdx - 1, 0));
   } else if (e.key === 'Enter') {
     e.preventDefault();
-    if (filteredResults[activeIdx]) executeItem(filteredResults[activeIdx], e.ctrlKey);
+    if (paletteMode === 'env-picker') {
+      if (filteredResults[activeIdx]) executeEnvItem(filteredResults[activeIdx]);
+    } else {
+      if (filteredResults[activeIdx]) executeItem(filteredResults[activeIdx], e.ctrlKey);
+    }
   }
 }
 
-function executeItem(item, newTab) {
+async function executeItem(item, newTab) {
   const base = window.location.origin;
+
+  if (item.label === 'Open in other environment…') {
+    await enterEnvPicker();
+    return;
+  }
 
   // Built-in command handlers (matched by label since these are fixed strings)
   const builtInActions = {
