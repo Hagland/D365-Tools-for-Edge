@@ -41,10 +41,6 @@ export function init({ onBack, onImported }) {
   document.getElementById('import-tables').addEventListener('change', (e) =>
     importList(e, 'tables', 'status-tables', onImported));
 
-  document.getElementById('btn-export-odata').addEventListener('click', () =>
-    exportList('odataEntities', 'd365-odata-entities.json'));
-  document.getElementById('import-odata').addEventListener('change', (e) =>
-    importList(e, 'odataEntities', 'status-odata', onImported));
 }
 
 /** Load current defaults into the settings form. Called each time the view is shown. */

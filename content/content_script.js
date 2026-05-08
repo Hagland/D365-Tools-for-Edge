@@ -3,9 +3,9 @@
 // ── Built-in commands (hardcoded handlers, not user-configurable) ─
 // TODO: Example actions for now
 const BUILT_IN_COMMANDS = [
-  { type: 'command', label: 'Open in environment' },
-  { type: 'command', label: 'Build OData link' },
-  { type: 'command', label: 'Refresh OData entities' },
+  { type: 'command', label: 'Open in environment',   description: 'Open the current page in another configured environment' },
+  { type: 'command', label: 'OData query designer',  description: 'Build and run OData queries against the current environment' },
+  { type: 'command', label: 'Sync entities',         description: 'Download and cache OData entity metadata from this environment' },
 ];
 
 // ── Runtime command list (built-ins + storage-loaded entries) ─
@@ -25,8 +25,8 @@ async function loadCommands() {
 }
 
 const TYPE_META = {
-  command: { label: 'Commands',   color: '#0f6cbd' },
-  menu:    { label: 'Menu items', color: '#107c41' },
+  command: { label: 'Actions',    color: '#0f6cbd' },
+  menu:    { label: 'Navigation', color: '#107c41' },
   table:   { label: 'Tables',     color: '#038387' },
 };
 
@@ -50,10 +50,11 @@ let activeIdx  = 0;
 let filteredResults = [];
 let suppressMouseEnter = false;
 
-// sub-mode state  ('normal' | 'env-picker')
-let paletteMode   = 'normal';
-let savedQuery    = '';
-let envPickerEnvs = [];
+// sub-mode state  ('normal' | 'env-picker' | 'odata-builder')
+let paletteMode        = 'normal';
+let savedQuery         = '';
+let envPickerEnvs      = [];
+let odataBuilderLabels = [];
 
 // ── Message listener ──────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg) => {
@@ -105,8 +106,8 @@ function openPalette() {
         <span>Ctrl+&#8629; new tab</span>
         <span>Esc dismiss</span>
         <span>&nbsp;·&nbsp;</span>
-        <span>&gt; commands</span>
-        <span>| menus</span>
+        <span>&gt; actions</span>
+        <span>| navigation</span>
         <span># tables</span>
       </div>
     </div>
@@ -135,8 +136,9 @@ function closePalette() {
 
 function onPaletteInput() {
   const val = document.getElementById('d365-palette-search')?.value ?? '';
-  if (paletteMode === 'env-picker') renderEnvPicker(val);
-  else                              renderResults(val);
+  if (paletteMode === 'env-picker')    renderEnvPicker(val);
+  else if (paletteMode === 'odata-builder') renderOdataBuilder(val);
+  else                                 renderResults(val);
 }
 
 // ── Normal results ────────────────────────────────────────────
@@ -173,12 +175,21 @@ function renderResults(query) {
       li.dataset.idx = idx;
 
       if (item.type === 'menu') {
-        const friendlyName = item.label.split(' > ').pop();
+        const friendlyName = item.label.split('>').pop().trim();
         li.innerHTML = `
           <span class="d365-pip" style="background:${meta.color};"></span>
           <span class="d365-result-text">
             <span class="d365-result-name">${highlightMatch(friendlyName, terms)}</span>
             <span class="d365-result-path">${highlightMatch(item.label, terms)}</span>
+          </span>
+          <span class="d365-enter-hint" aria-hidden="true">&#8629;</span>
+        `;
+      } else if (item.description) {
+        li.innerHTML = `
+          <span class="d365-pip" style="background:${meta.color};"></span>
+          <span class="d365-result-text">
+            <span class="d365-result-name">${highlightMatch(item.label, terms)}</span>
+            <span class="d365-result-path">${escHtml(item.description)}</span>
           </span>
           <span class="d365-enter-hint" aria-hidden="true">&#8629;</span>
         `;
@@ -312,15 +323,210 @@ function executeEnvItem(env) {
   }
 }
 
-function showNotImplemented(label) {
+function showPaletteMessage(text, { error = false, spinner = false } = {}) {
   const list = document.getElementById('d365-palette-results');
   if (!list) return;
   filteredResults = [];
   list.innerHTML = '';
   const msg = document.createElement('li');
-  msg.style.cssText = 'padding:20px 14px;text-align:center;color:var(--d365-text-secondary);font-size:13px;';
-  msg.textContent = `"${label}" — to be implemented.`;
+  msg.style.cssText = `padding:20px 14px;display:flex;align-items:center;justify-content:center;gap:10px;font-size:13px;color:${error ? 'var(--d365-text-primary)' : 'var(--d365-text-secondary)'};`;
+  if (spinner) {
+    const spin = document.createElement('span');
+    spin.className = 'd365-spinner';
+    msg.appendChild(spin);
+  }
+  msg.appendChild(document.createTextNode(text));
   list.appendChild(msg);
+}
+
+function showNotImplemented(label) {
+  showPaletteMessage(`"${label}" — to be implemented.`);
+}
+
+// ── OData builder sub-mode ────────────────────────────────────
+
+async function enterOdataBuilder() {
+  await openOdataBuilderMode();
+}
+
+async function openOdataBuilderMode() {
+  showPaletteMessage('Loading entities…', { spinner: true });
+
+  const resp = await chrome.runtime.sendMessage({ type: 'GET_ENTITY_LABELS', origin: window.location.origin });
+  if (!resp?.ok) {
+    showPaletteMessage(`Failed to load entities: ${resp?.error ?? 'Unknown error'}`, { error: true });
+    return;
+  }
+
+  if (resp.labels.length === 0) {
+    await syncEntities(async () => openOdataBuilderMode());
+    return;
+  }
+
+  odataBuilderLabels = resp.labels;
+  paletteMode = 'odata-builder';
+
+  const input = document.getElementById('d365-palette-search');
+  savedQuery = input.value;
+  input.value = '';
+  input.placeholder = 'Select entity…';
+  input.focus();
+
+  const footer = palette.querySelector('.d365-palette-footer');
+  footer.innerHTML = `
+    <span>&#8593; &#8595; navigate</span>
+    <span>&#8629; select</span>
+    <span>Esc back</span>
+  `;
+  const right = document.createElement('span');
+  right.style.cssText = 'margin-left:auto;display:flex;gap:10px;align-items:center;';
+  if (resp.syncedAt) {
+    const ts = document.createElement('span');
+    ts.textContent = `Synced ${new Date(resp.syncedAt).toLocaleString()}`;
+    right.appendChild(ts);
+  }
+  const refreshBtn = document.createElement('span');
+  refreshBtn.textContent = '⟳ Refresh';
+  refreshBtn.style.cursor = 'pointer';
+  refreshBtn.addEventListener('click', async () => {
+    exitOdataBuilder();
+    await syncEntities(async () => openOdataBuilderMode());
+  });
+  right.appendChild(refreshBtn);
+  footer.appendChild(right);
+
+  renderOdataBuilder('');
+}
+
+function exitOdataBuilder() {
+  paletteMode        = 'normal';
+  odataBuilderLabels = [];
+
+  const input = document.getElementById('d365-palette-search');
+  input.value       = savedQuery;
+  input.placeholder = 'Search…';
+  input.focus();
+
+  const footer = palette.querySelector('.d365-palette-footer');
+  footer.innerHTML = `
+    <span>&#8593; &#8595; navigate</span>
+    <span>&#8629; open</span>
+    <span>Ctrl+&#8629; new tab</span>
+    <span>Esc dismiss</span>
+    <span>&nbsp;·&nbsp;</span>
+    <span>&gt; commands</span>
+    <span>| menus</span>
+    <span># tables</span>
+  `;
+
+  renderResults(savedQuery);
+}
+
+function renderOdataBuilder(filter) {
+  const list = document.getElementById('d365-palette-results');
+  if (!list) return;
+
+  const terms = filter ? filter.toLowerCase().split(/\s+/).filter(Boolean) : [];
+  const shown = terms.length
+    ? odataBuilderLabels.filter((label) => matchesAllTerms(label, terms))
+    : odataBuilderLabels;
+
+  filteredResults = shown.map((label) => ({ type: 'odata', label }));
+  list.innerHTML = '';
+
+  if (shown.length === 0) {
+    const empty = document.createElement('li');
+    empty.className = 'd365-group-label';
+    empty.style.padding = '12px 14px';
+    empty.textContent = odataBuilderLabels.length === 0 ? 'No entities synced.' : 'No entities match.';
+    list.appendChild(empty);
+    activeIdx = 0;
+    return;
+  }
+
+  const groupLabel = document.createElement('li');
+  groupLabel.className = 'd365-group-label';
+  groupLabel.textContent = 'OData entities';
+  groupLabel.setAttribute('role', 'presentation');
+  list.appendChild(groupLabel);
+
+  shown.forEach((label, idx) => {
+    const li = document.createElement('li');
+    li.className = 'd365-result-row';
+    li.setAttribute('role', 'option');
+    li.dataset.idx = idx;
+    li.innerHTML = `
+      <span class="d365-pip" style="background:#8764b8;"></span>
+      <span class="d365-result-label">${highlightMatch(label, terms)}</span>
+      <span class="d365-enter-hint" aria-hidden="true">&#8629;</span>
+    `;
+    li.addEventListener('click', () => executeOdataEntity(label));
+    li.addEventListener('mouseenter', () => { if (!suppressMouseEnter) setActiveIdx(idx); });
+    list.appendChild(li);
+  });
+
+  activeIdx = 0;
+  updateActiveRow();
+}
+
+function executeOdataEntity(label) {
+  showNotImplemented(`OData link builder for "${label}"`);
+}
+
+// ── Entity sync ───────────────────────────────────────────────
+
+async function syncEntities(afterSync = null) {
+  showPaletteMessage('Fetching entity data — this may take several minutes.', { spinner: true });
+
+  let xml;
+  try {
+    const resp = await fetch(`${window.location.origin}/data/$metadata`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
+    xml = await resp.text();
+  } catch (err) {
+    showPaletteMessage(`Fetch failed: ${err.message}`, { error: true });
+    return;
+  }
+
+  showPaletteMessage('Parsing entities…', { spinner: true });
+
+  const doc = new DOMParser().parseFromString(xml, 'application/xml');
+  const entityTypeEls = doc.getElementsByTagNameNS('*', 'EntityType');
+  const entities = [];
+
+  for (const et of entityTypeEls) {
+    const name = et.getAttribute('Name');
+    if (!name) continue;
+
+    const keyNames = new Set(
+      [...et.getElementsByTagNameNS('*', 'PropertyRef')].map((pr) => pr.getAttribute('Name'))
+    );
+
+    const fields = [...et.getElementsByTagNameNS('*', 'Property')].map((prop) => ({
+      name:  prop.getAttribute('Name'),
+      type:  prop.getAttribute('Type'),
+      isKey: keyNames.has(prop.getAttribute('Name')),
+    }));
+
+    entities.push({ label: name, fields });
+  }
+
+  showPaletteMessage(`Saving ${entities.length} entities…`, { spinner: true });
+
+  try {
+    const resp = await chrome.runtime.sendMessage({ type: 'SAVE_ENTITIES', entities, origin: window.location.origin });
+    if (!resp?.ok) throw new Error(resp?.error ?? 'Unknown error');
+  } catch (err) {
+    showPaletteMessage(`Save failed: ${err.message}`, { error: true });
+    return;
+  }
+
+  if (afterSync) {
+    await afterSync();
+  } else {
+    showPaletteMessage(`Synced ${entities.length} entities.`);
+    setTimeout(closePalette, 1500);
+  }
 }
 
 // ── Shared palette helpers ────────────────────────────────────
@@ -382,14 +588,19 @@ function updateActiveRow() {
     const active = parseInt(row.dataset.idx) === activeIdx;
     row.classList.toggle('active', active);
     row.setAttribute('aria-selected', active);
-    if (active) row.scrollIntoView({ block: 'nearest' });
+    if (active) {
+        const prev = row.previousElementSibling;
+        (prev?.classList.contains('d365-group-label') ? prev : row)
+          .scrollIntoView({ block: 'nearest' });
+      }
   });
 }
 
 function handlePaletteKey(e) {
   e.stopPropagation();
   if (e.key === 'Escape') {
-    if (paletteMode === 'env-picker') { exitEnvPicker(); return; }
+    if (paletteMode === 'env-picker')    { exitEnvPicker(); return; }
+    if (paletteMode === 'odata-builder') { exitOdataBuilder(); return; }
     closePalette();
     return;
   }
@@ -403,8 +614,9 @@ function handlePaletteKey(e) {
     setActiveIdx(Math.max(activeIdx - 1, 0));
   } else if (e.key === 'Enter') {
     e.preventDefault();
-    if (paletteMode === 'env-picker') { if (filteredResults[activeIdx]) executeEnvItem(filteredResults[activeIdx]); }
-    else                               { if (filteredResults[activeIdx]) executeItem(filteredResults[activeIdx], e.ctrlKey); }
+    if (paletteMode === 'env-picker')    { if (filteredResults[activeIdx]) executeEnvItem(filteredResults[activeIdx]); }
+    else if (paletteMode === 'odata-builder') { if (filteredResults[activeIdx]) executeOdataEntity(filteredResults[activeIdx].label); }
+    else                                 { if (filteredResults[activeIdx]) executeItem(filteredResults[activeIdx], e.ctrlKey); }
   }
 }
 
@@ -416,8 +628,13 @@ async function executeItem(item, newTab) {
     return;
   }
 
-  if (item.label === 'Build OData link' || item.label === 'Refresh OData entities') {
-    showNotImplemented(item.label);
+  if (item.label === 'OData query designer') {
+    await enterOdataBuilder();
+    return;
+  }
+
+  if (item.label === 'Sync entities') {
+    await syncEntities();
     return;
   }
 

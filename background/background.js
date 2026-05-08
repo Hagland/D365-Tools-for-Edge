@@ -1,24 +1,22 @@
 // Service worker: seed default commands on install, relay keyboard shortcut
 
-import { getCustomCommands, saveCustomCommands } from '../shared/storage.js';
+import { getCustomCommands, saveCustomCommands, saveOdataEntities, getOdataEntityLabels, getOdataEntitySyncedAt } from '../shared/storage.js';
 
 // ── Seeding ───────────────────────────────────────────────────
 
 chrome.runtime.onInstalled.addListener(seedCustomCommands);
 
 async function seedCustomCommands() {
-  const [defaultMenuItems, defaultTables, defaultOdataEntities] = await Promise.all([
+  const [defaultMenuItems, defaultTables] = await Promise.all([
     loadDefault('menu-items.json'),
     loadDefault('tables.json'),
-    loadDefault('odata-entities.json'),
   ]);
 
   const existing = await getCustomCommands();
 
   await saveCustomCommands({
-    menuItems:     mergeByKey(existing.menuItems     ?? [], defaultMenuItems,     'mi'),
-    tables:        mergeByKey(existing.tables        ?? [], defaultTables,        'label'),
-    odataEntities: mergeByKey(existing.odataEntities ?? [], defaultOdataEntities, 'label'),
+    menuItems: mergeByKey(existing.menuItems ?? [], defaultMenuItems, 'mi'),
+    tables:    mergeByKey(existing.tables    ?? [], defaultTables,    'label'),
   });
 }
 
@@ -42,6 +40,23 @@ function mergeByKey(existing, defaults, key) {
   });
   return deduped;
 }
+
+// ── Message handlers ──────────────────────────────────────────
+
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.type === 'SAVE_ENTITIES') {
+    saveOdataEntities(msg.entities, msg.origin)
+      .then(() => sendResponse({ ok: true }))
+      .catch((err) => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
+  if (msg.type === 'GET_ENTITY_LABELS') {
+    Promise.all([getOdataEntityLabels(msg.origin), getOdataEntitySyncedAt(msg.origin)])
+      .then(([labels, syncedAt]) => sendResponse({ ok: true, labels, syncedAt }))
+      .catch((err) => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
+});
 
 // ── Keyboard shortcut relay ───────────────────────────────────
 
