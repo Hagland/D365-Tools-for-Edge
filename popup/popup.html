@@ -185,16 +185,46 @@
         <button type="button" class="toggle" id="s-toggle-class-runner" role="switch" aria-checked="false"></button>
       </div>
 
-      <div class="section-heading" style="margin-top:12px;">Import &amp; export</div>
-      <p class="hint-text">Back up all environments and settings as a JSON file, or restore from a previous backup.</p>
+      <div class="section-heading" style="margin-top:12px;">Configuration</div>
+      <p class="hint-text">Includes all environments, default settings, and custom menu items, tables, and OData entities.</p>
       <div class="import-export-row">
-        <button type="button" class="btn-secondary" id="btn-export">Export configuration</button>
+        <button type="button" class="btn-secondary" id="btn-export">Export</button>
         <label class="btn-secondary import-label">
-          Import configuration
+          Import
           <input type="file" accept=".json" id="import-file-input" class="visually-hidden" />
         </label>
       </div>
       <div id="import-status" class="import-status hidden" role="status"></div>
+
+      <div class="sub-section-heading" style="margin-top:12px;">Menu items</div>
+      <div class="import-export-row">
+        <button type="button" class="btn-secondary" id="btn-export-menu-items">Export</button>
+        <label class="btn-secondary import-label">
+          Import
+          <input type="file" accept=".json" id="import-menu-items" class="visually-hidden" />
+        </label>
+      </div>
+      <div id="status-menu-items" class="import-status hidden" role="status"></div>
+
+      <div class="sub-section-heading" style="margin-top:8px;">Tables</div>
+      <div class="import-export-row">
+        <button type="button" class="btn-secondary" id="btn-export-tables">Export</button>
+        <label class="btn-secondary import-label">
+          Import
+          <input type="file" accept=".json" id="import-tables" class="visually-hidden" />
+        </label>
+      </div>
+      <div id="status-tables" class="import-status hidden" role="status"></div>
+
+      <div class="sub-section-heading" style="margin-top:8px;">OData entities</div>
+      <div class="import-export-row">
+        <button type="button" class="btn-secondary" id="btn-export-odata">Export</button>
+        <label class="btn-secondary import-label">
+          Import
+          <input type="file" accept=".json" id="import-odata" class="visually-hidden" />
+        </label>
+      </div>
+      <div id="status-odata" class="import-status hidden" role="status"></div>
     </div>
   </div>
 

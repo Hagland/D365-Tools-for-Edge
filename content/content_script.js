@@ -9,42 +9,19 @@ const BUILT_IN_COMMANDS = [
   { type: 'command', label: 'Open database log' },
 ];
 
-// ── Placeholder examples — replace or extend via Settings > Custom commands ─
-// TODO: Remove these examples and add your real menu items and OData entities
-//       via the extension settings, or by editing customCommands in storage directly.
-//       Menu items need a `mi` value — the internal D365 menu item name (e.g. 'VendTableListPage').
-//       OData entities need a `label` matching the exact entity set name (e.g. 'VendVendorV2').
-//       Tables need a 'label' matching the exact table name (e.g. 'CustTable').
-
-const DEFAULT_MENU_ITEMS = [
-  // { label: 'Example module › Example area › Example page', mi: 'ExampleMenuItemName' },
-];
-
-const DEFAULT_ODATA_ENTITIES = [
-  // { label: 'ExampleTable' },
-];
-
-const DEFAULT_TABLES = [
-  // { label: 'CustTable' },
-];
-
-// ── Runtime command list (built-ins + storage-loaded custom entries) ─
+// ── Runtime command list (built-ins + storage-loaded entries) ─
+// Defaults are seeded into storage by the background service worker on install.
+// Edit defaults/menu-items.json, defaults/tables.json, defaults/odata-entities.json
+// to change what ships with the extension.
 let allCommands = [...BUILT_IN_COMMANDS];
 
 async function loadCommands() {
-  const data = await new Promise((resolve) =>
-    chrome.storage.local.get(['customCommands'], resolve)
-  );
-  const custom = data.customCommands ?? {};
+  const { customCommands } = await chrome.storage.local.get(['customCommands']);
+  const custom = customCommands ?? {};
 
-  const menuItems = (custom.menuItems?.length ? custom.menuItems : DEFAULT_MENU_ITEMS)
-    .map((item) => ({ type: 'menu', label: item.label, mi: item.mi }));
-
-  const odataEntities = (custom.odataEntities?.length ? custom.odataEntities : DEFAULT_ODATA_ENTITIES)
-    .map((item) => ({ type: 'odata', label: item.label }));
-
-  const tables = (custom.tables?.length ? custom.tables : DEFAULT_TABLES)
-    .map((item) => ({ type: 'table', label: item.label }));
+  const menuItems     = (custom.menuItems     ?? []).map((item) => ({ type: 'menu',  label: item.label, mi: item.mi }));
+  const odataEntities = (custom.odataEntities ?? []).map((item) => ({ type: 'odata', label: item.label }));
+  const tables        = (custom.tables        ?? []).map((item) => ({ type: 'table', label: item.label }));
 
   allCommands = [...BUILT_IN_COMMANDS, ...menuItems, ...odataEntities, ...tables];
 }
@@ -121,7 +98,7 @@ function openPalette() {
           <circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/>
           <line x1="11" y1="11" x2="14.5" y2="14.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
         </svg>
-        <input id="d365-palette-search" type="text" placeholder="Search…  > commands  / menus  | odata  # tables" autocomplete="off" spellcheck="false" />
+        <input id="d365-palette-search" type="text" placeholder="Search…" autocomplete="off" spellcheck="false" />
         <kbd class="d365-esc-badge">Esc</kbd>
       </div>
       <ul id="d365-palette-results" class="d365-palette-results" role="listbox"></ul>
@@ -172,7 +149,7 @@ function onPaletteInput() {
 
 function renderResults(query) {
   const { filter, types } = parseQuery(query);
-  const lower = filter.toLowerCase();
+  const terms = filter ? filter.toLowerCase().split(/\s+/).filter(Boolean) : [];
   const list = document.getElementById('d365-palette-results');
   if (!list) return;
 
@@ -181,7 +158,7 @@ function renderResults(query) {
 
   types.forEach((type) => {
     const items = allCommands.filter(
-      (c) => c.type === type && (!lower || c.label.toLowerCase().includes(lower))
+      (c) => c.type === type && (!terms.length || matchesAllTerms(c.label, terms))
     );
     if (items.length === 0) return;
 
@@ -200,11 +177,25 @@ function renderResults(query) {
       li.className = 'd365-result-row';
       li.setAttribute('role', 'option');
       li.dataset.idx = idx;
-      li.innerHTML = `
-        <span class="d365-pip" style="background:${meta.color};"></span>
-        <span class="d365-result-label">${highlightMatch(item.label, lower)}</span>
-        <span class="d365-enter-hint" aria-hidden="true">&#8629;</span>
-      `;
+
+      if (item.type === 'menu') {
+        const friendlyName = item.label.split(' > ').pop();
+        li.innerHTML = `
+          <span class="d365-pip" style="background:${meta.color};"></span>
+          <span class="d365-result-text">
+            <span class="d365-result-name">${highlightMatch(friendlyName, terms)}</span>
+            <span class="d365-result-path">${highlightMatch(item.label, terms)}</span>
+          </span>
+          <span class="d365-enter-hint" aria-hidden="true">&#8629;</span>
+        `;
+      } else {
+        li.innerHTML = `
+          <span class="d365-pip" style="background:${meta.color};"></span>
+          <span class="d365-result-label">${highlightMatch(item.label, terms)}</span>
+          <span class="d365-enter-hint" aria-hidden="true">&#8629;</span>
+        `;
+      }
+
       li.addEventListener('click', (e) => executeItem(item, e.ctrlKey));
       li.addEventListener('mouseenter', () => setActiveIdx(idx));
       list.appendChild(li);
@@ -250,7 +241,7 @@ function exitEnvPicker() {
 
   const input = document.getElementById('d365-palette-search');
   input.value = savedQuery;
-  input.placeholder = 'Search…  > commands  / menus  | odata  # tables';
+  input.placeholder = 'Search…';
   input.focus();
 
   const footer = palette.querySelector('.d365-palette-footer');
@@ -273,9 +264,9 @@ function renderEnvPicker(filter) {
   const list = document.getElementById('d365-palette-results');
   if (!list) return;
 
-  const lower = filter.toLowerCase();
-  const shown = lower
-    ? envPickerEnvs.filter((e) => e.name.toLowerCase().includes(lower))
+  const terms = filter ? filter.toLowerCase().split(/\s+/).filter(Boolean) : [];
+  const shown = terms.length
+    ? envPickerEnvs.filter((e) => matchesAllTerms(e.name, terms))
     : envPickerEnvs;
 
   filteredResults = shown;
@@ -306,7 +297,7 @@ function renderEnvPicker(filter) {
     li.dataset.idx = idx;
     li.innerHTML = `
       <span class="d365-pip" style="background:${escHtml(env.color ?? '#0f6cbd')};"></span>
-      <span class="d365-result-label">${highlightMatch(env.name, lower)}</span>
+      <span class="d365-result-label">${highlightMatch(env.name, terms)}</span>
       <span class="d365-enter-hint" aria-hidden="true">&#8629;</span>
     `;
     li.addEventListener('click', () => executeEnvItem(env));
@@ -330,16 +321,49 @@ function executeEnvItem(env) {
 
 // ── Shared palette helpers ────────────────────────────────────
 
-function highlightMatch(text, query) {
-  if (!query) return escHtml(text);
+function matchesAllTerms(text, terms) {
   const lower = text.toLowerCase();
-  const idx = lower.indexOf(query);
-  if (idx === -1) return escHtml(text);
-  return (
-    escHtml(text.slice(0, idx)) +
-    `<mark style="color:var(--d365-accent);font-weight:700;background:none;">${escHtml(text.slice(idx, idx + query.length))}</mark>` +
-    escHtml(text.slice(idx + query.length))
-  );
+  return terms.every((t) => lower.includes(t));
+}
+
+function highlightMatch(text, terms) {
+  if (!terms.length) return escHtml(text);
+  const lower = text.toLowerCase();
+
+  // Collect all match ranges for every term
+  const ranges = [];
+  for (const term of terms) {
+    let pos = 0;
+    while (pos < lower.length) {
+      const idx = lower.indexOf(term, pos);
+      if (idx === -1) break;
+      ranges.push([idx, idx + term.length]);
+      pos = idx + 1;
+    }
+  }
+  if (!ranges.length) return escHtml(text);
+
+  // Sort and merge overlapping ranges
+  ranges.sort((a, b) => a[0] - b[0]);
+  const merged = [[...ranges[0]]];
+  for (let i = 1; i < ranges.length; i++) {
+    const last = merged[merged.length - 1];
+    if (ranges[i][0] <= last[1]) {
+      last[1] = Math.max(last[1], ranges[i][1]);
+    } else {
+      merged.push([...ranges[i]]);
+    }
+  }
+
+  // Build highlighted string
+  let result = '';
+  let pos = 0;
+  for (const [start, end] of merged) {
+    result += escHtml(text.slice(pos, start));
+    result += `<mark style="color:var(--d365-accent);font-weight:700;background:none;">${escHtml(text.slice(start, end))}</mark>`;
+    pos = end;
+  }
+  return result + escHtml(text.slice(pos));
 }
 
 function setActiveIdx(idx) {
@@ -405,7 +429,7 @@ async function executeItem(item, newTab) {
 
   // Menu items: use explicit `mi` if provided, fall back to last label segment
   if (item.type === 'menu') {
-    const mi = item.mi ?? item.label.split(' › ').pop().replace(/\s+/g, '');
+    const mi = item.mi ?? item.label.split(' > ').pop().replace(/\s+/g, '');
     navigate(`${base}/?mi=${encodeURIComponent(mi)}`, newTab);
     return;
   }
