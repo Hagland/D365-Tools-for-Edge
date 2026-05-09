@@ -2,7 +2,7 @@
 // Content scripts cannot use extension IndexedDB — they read from chrome.storage.local,
 // which this module keeps in sync after every write.
 
-import { dbGetAll, dbGet, dbPut, dbDelete, dbClearAndPutAll } from './db.js';
+import { dbGetAll, dbGet, dbPut, dbPutAll, dbDelete, dbClearAndPutAll, dbClearRangeAndPutAll } from './db.js';
 
 const STORAGE_VERSION = 1;
 
@@ -82,9 +82,14 @@ export async function saveCustomCommands(customCommands) {
   await syncCommandsToLocal();
 }
 
-export async function getOdataEntityLabels(origin) {
-  const rec = await dbGet('kv', `entities::${origin}`);
-  return (rec?.value ?? []).map((e) => e.label);
+export async function getOdataEntityIndex(origin) {
+  const rec = await dbGet('kv', `entityIndex::${origin}`);
+  return rec?.value ?? [];
+}
+
+export async function getOdataEntityDetail(publicCollectionName, origin) {
+  const rec = await dbGet('kv', `entity::${origin}::${publicCollectionName}`);
+  return rec?.value ?? null;
 }
 
 export async function getOdataEntitySyncedAt(origin) {
@@ -92,12 +97,16 @@ export async function getOdataEntitySyncedAt(origin) {
   return rec?.value ?? null;
 }
 
-export async function saveOdataEntities(entities, origin) {
+export async function saveOdataEntities({ index, entities, enums }, origin) {
   const syncedAt = new Date().toISOString();
-  await Promise.all([
-    dbPut('kv', { key: `entities::${origin}`,  value: entities }),
-    dbPut('kv', { key: `syncedAt::${origin}`,  value: syncedAt }),
-  ]);
+  const records = [
+    { key: `entityIndex::${origin}`, value: index   },
+    { key: `enums::${origin}`,       value: enums   },
+    { key: `syncedAt::${origin}`,    value: syncedAt },
+    ...entities.map((e) => ({ key: `entity::${origin}::${e.publicCollectionName}`, value: e })),
+  ];
+  // Clear stale entity detail records for this origin atomically before writing new ones
+  await dbClearRangeAndPutAll('kv', `entity::${origin}::`, `entity::${origin}::￿`, records);
 }
 
 /** Replace all stored data atomically — used by the full-config import.

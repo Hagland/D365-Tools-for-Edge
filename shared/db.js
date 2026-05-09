@@ -67,6 +67,31 @@ export async function dbDelete(storeName, key) {
   });
 }
 
+// Put many records in a single transaction (more efficient than looping dbPut)
+export async function dbPutAll(storeName, records) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx    = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+    records.forEach((r) => store.put(r));
+    tx.oncomplete = () => resolve();
+    tx.onerror    = () => reject(tx.error);
+  });
+}
+
+// Delete all records whose key falls within [lower, upper], then put new records — single transaction
+export async function dbClearRangeAndPutAll(storeName, lower, upper, records) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx    = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+    store.delete(IDBKeyRange.bound(lower, upper));
+    records.forEach((r) => store.put(r));
+    tx.oncomplete = () => resolve();
+    tx.onerror    = () => reject(tx.error);
+  });
+}
+
 // Replace all records in a store atomically (clear + put in one transaction)
 export async function dbClearAndPutAll(storeName, records) {
   const db = await openDB();
