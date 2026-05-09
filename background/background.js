@@ -1,6 +1,6 @@
 // Service worker: seed default commands on install, relay keyboard shortcut
 
-import { getCustomCommands, saveCustomCommands, saveOdataEntities, getOdataEntityLabels, getOdataEntitySyncedAt } from '../shared/storage.js';
+import { getCustomCommands, saveCustomCommands, saveOdataEntities, getOdataEntityIndex, getOdataEntityDetail, getOdataEntitySyncedAt } from '../shared/storage.js';
 
 // ── Seeding ───────────────────────────────────────────────────
 
@@ -45,14 +45,20 @@ function mergeByKey(existing, defaults, key) {
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'SAVE_ENTITIES') {
-    saveOdataEntities(msg.entities, msg.origin)
+    saveOdataEntities({ index: msg.index, entities: msg.entities, enums: msg.enums }, msg.origin)
       .then(() => sendResponse({ ok: true }))
       .catch((err) => sendResponse({ ok: false, error: err.message }));
     return true;
   }
-  if (msg.type === 'GET_ENTITY_LABELS') {
-    Promise.all([getOdataEntityLabels(msg.origin), getOdataEntitySyncedAt(msg.origin)])
-      .then(([labels, syncedAt]) => sendResponse({ ok: true, labels, syncedAt }))
+  if (msg.type === 'GET_ENTITY_INDEX') {
+    Promise.all([getOdataEntityIndex(msg.origin), getOdataEntitySyncedAt(msg.origin)])
+      .then(([index, syncedAt]) => sendResponse({ ok: true, index, syncedAt }))
+      .catch((err) => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
+  if (msg.type === 'GET_ENTITY_DETAIL') {
+    getOdataEntityDetail(msg.publicCollectionName, msg.origin)
+      .then((entity) => sendResponse({ ok: true, entity }))
       .catch((err) => sendResponse({ ok: false, error: err.message }));
     return true;
   }
